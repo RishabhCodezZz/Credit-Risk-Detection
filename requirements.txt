@@ -1,0 +1,15 @@
+# Developed against the Kaggle Python GPU notebook image. Versions are not pinned because
+# that image is updated by Kaggle independently of this repo; install without version
+# constraints to match whatever the current image ships.
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+lightgbm
+xgboost
+catboost
+optuna
+shap
+torch
+joblib
