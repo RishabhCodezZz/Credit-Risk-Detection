@@ -357,9 +357,6 @@ merely fast in practice.
    budget. `FAST_MODE = False` runs the full search and is what produced every number in this README:
    **22.9 min** on GPU T4×2, wall-clock bounded at every tuning stage so it cannot hang.
 
-   The `1.5–2.5 h` figure in the notebook's own config comment is a pre-measurement estimate from
-   before the tuning stage was bounded; the measured full run is the 22.9 min above.
-
 ## Honest limitations
 
 - The dataset is synthetic; results here do not transfer to real credit-risk decisioning.
