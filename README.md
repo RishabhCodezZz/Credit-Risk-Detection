@@ -78,9 +78,9 @@ no row ever sees its own current or future values. A customer's first month has 
 filled with a structural zero, not a population average pretending they have average history.
 
 **4. Model selection on out-of-fold predictions only.** Ten model variants are trained under
-`StratifiedGroupKFold` (5 folds), tuned with Optuna (30 trials/model, GPU-parallel, wall-clock
-bounded), and ranked purely on OOF macro-F1. **The holdout set is touched exactly once, at the very
-end**, by whichever model won on OOF — never used to pick the winner.
+`StratifiedGroupKFold` (5 folds), tuned with Optuna (30 trials/model, wall-clock bounded, studies run
+sequentially), and ranked purely on OOF macro-F1. **The holdout set is touched exactly once, at the
+very end**, by whichever model won on OOF — never used to pick the winner.
 
 **5. Ensembling and threshold tuning, fit on OOF, verified on holdout.** A greedy-selected weighted
 blend of the trained models beats every single model. A per-class decision-threshold search is also
@@ -147,9 +147,11 @@ used for model selection — holdout was not consulted):
 | PyTorch_MLP | 0.6636 | 0.6744 | 0.6704 | 0.8482 | 0.7373 |
 | Logistic Regression | 0.6493 | 0.6623 | 0.6574 | 0.8108 | 0.8176 |
 
-Note how tightly the top 7 cluster (0.678–0.684): five different model families landed within 0.006
-macro-F1 of each other, which is the signal that drove the diagnostics below — the ceiling here is
-the feature set, not the algorithm.
+Note how tightly these cluster. The four tree-based families — Random Forest, LightGBM, XGBoost and
+CatBoost — land within **0.002** macro-F1 of each other (0.6827–0.6841), and all eight tree variants
+sit inside **0.006** (0.6784–0.6841). Only the neural net and the linear baseline fall meaningfully
+behind. That clustering is the signal that drove the diagnostics below: the ceiling here is the
+feature set, not the algorithm.
 
 ### Ensemble composition
 
@@ -280,7 +282,7 @@ respectively, so these columns are never imputed.
 
 ### Explainability (SHAP)
 
-Top 20 features by mean |SHAP| value, `LightGBM_tuned`, fold-0 model, 2,000-row holdout sample:
+Top 20 features by mean |SHAP| value, `LightGBM_tuned`, fold-0 model, 1,500-row holdout sample:
 
 | Rank | Feature | Mean \|SHAP\| |
 |---|---|---|
@@ -328,9 +330,13 @@ Wall-clock progress through the full (`FAST_MODE=False`) run, 22.9 minutes end-t
 | 22.2 min | Neural baseline (PyTorch MLP) | 0.8 min |
 | 22.9 min | Final holdout evaluation + SHAP | 0.7 min |
 
-An earlier version of this tuning stage didn't finish in 5 hours (unbounded per-trial cost — see
-[`CLAUDE.md`](CLAUDE.md) for the fix). Every expensive stage is now wall-clock-capped by construction,
-not just fast in practice.
+An earlier version of this tuning stage didn't finish in 5 hours. The cause was unbounded per-trial
+cost: 40 trials × 3 folds × 2 studies = 240 model fits, each allowed up to 3,000 boosting iterations
+— and because multiclass LightGBM grows one tree *per class* per iteration, that ceiling was really
+9,000 trees per fit. The fix was to bound the search on both axes (trial count **and** a hard
+wall-clock `timeout`), tune on a group-aware subsample, and print per-trial progress so a slow stage
+is never mistaken for a hung one. Every expensive stage is now wall-clock-capped by construction, not
+merely fast in practice.
 
 ## Repository contents
 
@@ -346,9 +352,13 @@ not just fast in practice.
 1. Open `credit_score_model.ipynb` on [Kaggle](https://www.kaggle.com/code).
 2. **+ Add Input** → search "Credit Score Classification" (ParisRohan) → Add.
 3. **Settings → Accelerator → GPU T4 ×2.**
-4. Run All. `FAST_MODE = True` in the config cell gives a ~30–45 min smoke run; `False` runs the
-   full search (~1.5–2.5 h, wall-clock bounded at every tuning stage so it cannot hang) and is what
-   produced every number in this README.
+4. Run All. `FAST_MODE = True` in the config cell gives a ~15 min smoke run (fewer Optuna trials,
+   tighter tree ceilings) — use it to confirm the notebook completes cleanly before spending the full
+   budget. `FAST_MODE = False` runs the full search and is what produced every number in this README:
+   **22.9 min** on GPU T4×2, wall-clock bounded at every tuning stage so it cannot hang.
+
+   The `1.5–2.5 h` figure in the notebook's own config comment is a pre-measurement estimate from
+   before the tuning stage was bounded; the measured full run is the 22.9 min above.
 
 ## Honest limitations
 
