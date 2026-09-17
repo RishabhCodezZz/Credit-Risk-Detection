@@ -13,3 +13,9 @@ optuna
 shap
 torch
 joblib
+
+# For tabular_foundation_model_benchmark.ipynb only (the main notebook doesn't need these).
+# Also unpinned, same reasoning; tabpfn specifically also needs a TABPFN_TOKEN (see that
+# notebook's own markdown) since TabPFN >= 2.5 gates local weight downloads behind a license.
+tabpfn
+autogluon.tabular[tabicl]

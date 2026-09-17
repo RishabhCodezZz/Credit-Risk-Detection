@@ -411,7 +411,7 @@ Worth stating plainly:
 - **TabPFN-3.5, given the right input format, is close to a clean win.** 0.0029 behind the tuned
   ensemble on macro-F1, and essentially matching it on AUC (0.8713 vs 0.8715) — with zero
   hyperparameter search. The remaining honest caveat is cost, not accuracy: ~11 minutes to predict
-  20,000 rows is still roughly 470x XGBoost's 1.4 seconds, even after an 8x improvement from the
+  20,000 rows is still roughly 480x XGBoost's 1.4 seconds, even after an 8x improvement from the
   encoding and row-cap fix.
 - **TabICLv2 was not evaluated, after three good-faith attempts, not one.** AutoGluon's own memory
   estimator exceeded this machine's ~28GB budget every time: 38.5GB at 64,000 rows (one-hot), 68.1GB
