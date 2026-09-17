@@ -36,6 +36,7 @@ and this pipeline measures, then eliminates, that inflation.**
 - [Repository contents](#repository-contents)
 - [Running it](#running-it)
 - [Honest limitations](#honest-limitations)
+- [Tabular foundation model bake-off](#tabular-foundation-model-bake-off)
 
 ---
 
@@ -344,6 +345,9 @@ merely fast in practice.
 |---|---|
 | `credit_score_model.ipynb` | Source notebook — clean, unexecuted, ready to run on Kaggle |
 | `credit_score_model_executed.ipynb` | Full run with all outputs (the source of every number above), Kaggle GPU T4×2, ~23 min |
+| `tabular_foundation_model_benchmark.ipynb` | Companion notebook — benchmarks TabPFN-3.5 and TabICLv2 against XGBoost/CatBoost on the identical split, see below |
+| `tabular_foundation_model_benchmark_executed.ipynb` | Full run with all outputs, Kaggle GPU T4×2 |
+| `tfm_bakeoff_results.csv` | Machine-readable results from that run |
 | `requirements.txt` | Python dependencies (unpinned — matches whatever the current Kaggle GPU image ships) |
 | `LICENSE` | MIT |
 
@@ -368,3 +372,39 @@ merely fast in practice.
 - Effective independent sample size is closer to 12,500 (unique customers) than 100,000 (rows) —
   41.7% of customers hold a single label across all 8 of their months, so many rows are correlated
   repeats of the same underlying signal, not independent observations.
+
+## Tabular foundation model bake-off
+
+Raised in [issue #1](https://github.com/RishabhCodezZz/Credit-Risk-Detection/issues/1): the ten
+models compared above are all gradient-boosted trees or close relatives, so the "feature-limited,
+not model-limited" conclusion had only ever been tested against more trees. `tabular_foundation_model_benchmark.ipynb`
+tests it against a genuinely different architecture — in-context tabular transformers — on the
+identical customer-grouped split, reusing the main notebook's cleaning/imputation/feature code
+verbatim so the comparison is on the same feature set.
+
+| Model | Holdout macro-F1 | AUC | Accuracy | Log loss | Fit | Predict |
+|---|---|---|---|---|---|---|
+| **XGBoost** (untuned) | **0.7033** | 0.8678 | 0.7108 | 0.6511 | 52s | 1.3s |
+| TabPFN-3.5 | 0.6986 | **0.8686** | **0.7122** | **0.6329** | 31s | **5,544s (~92 min)** |
+| CatBoost (untuned) | 0.6929 | 0.8684 | 0.6968 | 0.6712 | 28s | 0.4s |
+| TabICLv2 (via AutoGluon) | not evaluated — see below | | | | | |
+| *This repo's tuned 7-model blend, for reference* | *0.7046* | *0.8715* | | | | |
+
+Worth stating plainly:
+
+- **A single untuned XGBoost call lands within 0.0013 macro-F1 of this repo's fully-tuned,
+  greedy-blended, 7-model ensemble.** Independent confirmation, from a completely separate
+  notebook, of the same "feature-limited, not model-limited" diagnosis this repo already made from
+  model clustering and a flat learning curve.
+- **TabPFN-3.5 is not the accuracy story — it's the cost story.** It won on AUC, accuracy, and log
+  loss, and lost macro-F1 by half a point. It also took **~92 minutes to predict on 20,000 rows**,
+  against XGBoost's 1.3 seconds — roughly 4,000× slower for a marginally worse score. "Comparable
+  accuracy at a cost that makes it impractical here" is a more useful finding than either
+  "foundation models win" or "foundation models lose."
+- **TabICLv2 was not evaluated, honestly.** AutoGluon's own memory estimator refused to fit it
+  twice, on two different training-row counts, with the estimate getting *worse* (not better) on
+  fewer rows — a sign the ~28GB ceiling on Kaggle's standard instance is driven by the 146-column
+  feature representation or the model's own architecture, not something a smaller sample fixes.
+  Reported as not evaluated rather than forced past a memory-safety check.
+- Google's TabFM and TabDPT-Turbo (also named in the issue) aren't tested here — out of scope for
+  this pass, left for a future addition rather than claimed to be covered.
