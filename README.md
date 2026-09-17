@@ -380,15 +380,27 @@ models compared above are all gradient-boosted trees or close relatives, so the 
 not model-limited" conclusion had only ever been tested against more trees. `tabular_foundation_model_benchmark.ipynb`
 tests it against a genuinely different architecture — in-context tabular transformers — on the
 identical customer-grouped split, reusing the main notebook's cleaning/imputation/feature code
-verbatim so the comparison is on the same feature set.
+verbatim. XGBoost and CatBoost get the same one-hot matrix as before; TabPFN and TabICLv2 get a
+lighter, label-encoded version of the same underlying features instead (see the revision note
+below) — the *pipeline* is shared, not the final encoding, since one-hot expansion turned out to
+be a real handicap for the foundation models specifically.
 
 | Model | Holdout macro-F1 | AUC | Accuracy | Log loss | Fit | Predict |
 |---|---|---|---|---|---|---|
-| **XGBoost** (untuned) | **0.7033** | 0.8678 | 0.7108 | 0.6511 | 52s | 1.3s |
-| TabPFN-3.5 | 0.6986 | **0.8686** | **0.7122** | **0.6329** | 31s | **5,544s (~92 min)** |
-| CatBoost (untuned) | 0.6929 | 0.8684 | 0.6968 | 0.6712 | 28s | 0.4s |
+| **XGBoost** (untuned) | **0.7033** | 0.8678 | 0.7108 | 0.6511 | 53s | 1.4s |
+| TabPFN-3.5 | 0.7017 | **0.8713** | **0.7186** | **0.6241** | 15s | 666s (~11.1 min) |
+| CatBoost (untuned) | 0.6929 | 0.8684 | 0.6968 | 0.6712 | 29s | 0.5s |
 | TabICLv2 (via AutoGluon) | not evaluated — see below | | | | | |
 | *This repo's tuned 7-model blend, for reference* | *0.7046* | *0.8715* | | | | |
+
+**Revision note:** the numbers above reflect a fix made after a reader (Prashanth, in the same
+issue) pointed out that foundation models expect raw/dense columns, not a pre-expanded one-hot
+matrix built for trees. He was right — TabPFN-3.5 originally scored 0.6986 macro-F1 with a
+92-minute predict time on the one-hot frame; switching it to a compact, label-encoded frame and
+capping its per-fold training context (which had quietly been the full 64,000-row fold every time,
+not just on error) moved *both* numbers in the right direction at once: macro-F1 up to 0.7017,
+predict time down to ~11 minutes. Worth stating plainly: the fix didn't just make it faster, it made
+it more accurate too.
 
 Worth stating plainly:
 
@@ -396,15 +408,20 @@ Worth stating plainly:
   greedy-blended, 7-model ensemble.** Independent confirmation, from a completely separate
   notebook, of the same "feature-limited, not model-limited" diagnosis this repo already made from
   model clustering and a flat learning curve.
-- **TabPFN-3.5 is not the accuracy story — it's the cost story.** It won on AUC, accuracy, and log
-  loss, and lost macro-F1 by half a point. It also took **~92 minutes to predict on 20,000 rows**,
-  against XGBoost's 1.3 seconds — roughly 4,000× slower for a marginally worse score. "Comparable
-  accuracy at a cost that makes it impractical here" is a more useful finding than either
-  "foundation models win" or "foundation models lose."
-- **TabICLv2 was not evaluated, honestly.** AutoGluon's own memory estimator refused to fit it
-  twice, on two different training-row counts, with the estimate getting *worse* (not better) on
-  fewer rows — a sign the ~28GB ceiling on Kaggle's standard instance is driven by the 146-column
-  feature representation or the model's own architecture, not something a smaller sample fixes.
-  Reported as not evaluated rather than forced past a memory-safety check.
+- **TabPFN-3.5, given the right input format, is close to a clean win.** 0.0029 behind the tuned
+  ensemble on macro-F1, and essentially matching it on AUC (0.8713 vs 0.8715) — with zero
+  hyperparameter search. The remaining honest caveat is cost, not accuracy: ~11 minutes to predict
+  20,000 rows is still roughly 470x XGBoost's 1.4 seconds, even after an 8x improvement from the
+  encoding and row-cap fix.
+- **TabICLv2 was not evaluated, after three good-faith attempts, not one.** AutoGluon's own memory
+  estimator exceeded this machine's ~28GB budget every time: 38.5GB at 64,000 rows (one-hot), 68.1GB
+  at 30,000 rows (one-hot — worse, not better, despite fewer rows), and 58.8GB at 30,000 rows on the
+  same native-categorical frame that helped TabPFN (an improvement over the one-hot estimate at the
+  same row count, just not enough). The non-monotonic relationship with row count is itself the
+  finding: it points at how TabICL scales memory with training-context size, not at a fixable
+  encoding or sample-size choice. A ~4,800-row smoke test ran cleanly with no warning at all, so a
+  smaller-scale version of this comparison is possible — just not one that says anything about the
+  full dataset. Reported as a genuine hardware/model-scale limit rather than chased with a fourth
+  guess.
 - Google's TabFM and TabDPT-Turbo (also named in the issue) aren't tested here — out of scope for
   this pass, left for a future addition rather than claimed to be covered.
