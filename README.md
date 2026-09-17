@@ -345,7 +345,7 @@ merely fast in practice.
 |---|---|
 | `credit_score_model.ipynb` | Source notebook — clean, unexecuted, ready to run on Kaggle |
 | `credit_score_model_executed.ipynb` | Full run with all outputs (the source of every number above), Kaggle GPU T4×2, ~23 min |
-| `tabular_foundation_model_benchmark.ipynb` | Companion notebook — benchmarks TabPFN-3.5 and TabICLv2 against XGBoost/CatBoost on the identical split, see below |
+| `tabular_foundation_model_benchmark.ipynb` | Companion notebook — benchmarks TabPFN-3.5 against XGBoost/CatBoost on the identical split (TabICLv2 attempted, not evaluated — see below) |
 | `tabular_foundation_model_benchmark_executed.ipynb` | Full run with all outputs, Kaggle GPU T4×2 |
 | `tfm_bakeoff_results.csv` | Machine-readable results from that run |
 | `requirements.txt` | Python dependencies (unpinned — matches whatever the current Kaggle GPU image ships) |
